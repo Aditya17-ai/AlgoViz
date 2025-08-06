@@ -8,8 +8,8 @@ export interface VisualizationStep {
   id: number;
   description: string;
   data: any;
-  highlightedElements?: number[];
-  comparingElements?: number[];
+  highlightedElements?: number[] | string[];
+  comparingElements?: number[] | string[];
   swappingElements?: number[];
   sortedElements?: number[];
 }
@@ -40,9 +40,26 @@ export class VisualizationEngine {
       case "linear search":
         this.steps = this.generateLinearSearchSteps();
         break;
+      case "dijkstra's algorithm":
+      case "dijkstra":
+        this.steps = this.generateDijkstraSteps();
+        break;
       default:
         this.steps = this.generateGenericSteps();
     }
+  }
+
+  private generateDijkstraSteps(): VisualizationStep[] {
+    if (!this.inputData.nodes || !this.inputData.edges || !this.inputData.startNode) return [];
+    const graphSteps = dijkstraVisualization(this.inputData.nodes, this.inputData.edges, this.inputData.startNode);
+    return graphSteps.map((step, index) => ({
+      id: index,
+      description: step.description,
+      data: { nodes: step.nodes, edges: step.edges },
+      highlightedElements: step.visitedNodes,
+      comparingElements: step.currentNode ? [step.currentNode] : undefined,
+      // You can add more mappings as needed for your visualization
+    }));
   }
 
   private generateBubbleSortSteps(): VisualizationStep[] {

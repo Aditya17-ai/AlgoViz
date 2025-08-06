@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react";
 import type { Algorithm } from "@shared/schema";
 import { useCanvas } from "@/hooks/use-canvas";
 
+
 interface AlgorithmCanvasProps {
   algorithm: Algorithm;
   inputData: any;
   currentStep: number;
   isPlaying: boolean;
+  currentStepData?: any; // Pass the current step's data for accurate visualization
 }
 
 export default function AlgorithmCanvas({
@@ -14,6 +16,7 @@ export default function AlgorithmCanvas({
   inputData,
   currentStep,
   isPlaying,
+  currentStepData,
 }: AlgorithmCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { draw, clearCanvas } = useCanvas(canvasRef);
@@ -34,8 +37,13 @@ export default function AlgorithmCanvas({
 
     clearCanvas();
     
-    if (algorithm.category === "sorting" && inputData.array) {
-      drawArrayVisualization(ctx, inputData.array, currentStep, algorithm);
+    if (algorithm.category === "sorting" && currentStepData) {
+      drawArrayVisualization(
+        ctx,
+        currentStepData.array,
+        currentStepData,
+        algorithm
+      );
     } else if (algorithm.category === "searching" && inputData.array) {
       drawSearchVisualization(ctx, inputData.array, currentStep, algorithm);
     } else if (algorithm.category === "graph" && inputData.graph) {
@@ -46,7 +54,7 @@ export default function AlgorithmCanvas({
   const drawArrayVisualization = (
     ctx: CanvasRenderingContext2D,
     array: number[],
-    step: number,
+    stepData: any,
     algorithm: Algorithm
   ) => {
     const canvas = ctx.canvas;
@@ -60,18 +68,16 @@ export default function AlgorithmCanvas({
       const height = (value / maxValue) * maxHeight;
       const y = canvas.height - height - 20;
 
-      // Determine color based on algorithm state
-      let color = algorithm.visualization.colors.default;
-      
-      // Simple state simulation based on step
-      if (step > 0) {
-        if (index < step / 2) {
-          color = algorithm.visualization.colors.sorted || color;
-        } else if (index === Math.floor(step / 2)) {
-          color = algorithm.visualization.colors.comparing || color;
-        } else if (index === Math.floor(step / 2) + 1) {
-          color = algorithm.visualization.colors.swapping || color;
-        }
+      // Determine color based on stepData
+      // Fix: Cast visualization to expected type
+      const viz = algorithm.visualization as any;
+      let color = viz.colors?.default;
+      if (stepData.sorted && stepData.sorted.includes(index)) {
+        color = viz.colors?.sorted || color;
+      } else if (stepData.swapping && stepData.swapping.includes(index)) {
+        color = viz.colors?.swapping || color;
+      } else if (stepData.comparing && stepData.comparing.includes(index)) {
+        color = viz.colors?.comparing || color;
       }
 
       // Draw bar
@@ -102,14 +108,15 @@ export default function AlgorithmCanvas({
       const y = canvas.height / 2 - barHeight / 2;
 
       // Determine color based on search state
-      let color = algorithm.visualization.colors.default;
+      const viz = algorithm.visualization as any;
+      let color = viz.colors?.default;
       
       if (step > 0) {
         const searchIndex = Math.floor(step / 2);
         if (index === searchIndex) {
-          color = algorithm.visualization.colors.searching || color;
+          color = viz.colors?.searching || color;
         } else if (index < searchIndex) {
-          color = algorithm.visualization.colors.eliminated || color;
+          color = viz.colors?.eliminated || color;
         }
       }
 
@@ -125,53 +132,86 @@ export default function AlgorithmCanvas({
     });
   };
 
+  // Maze-style visualization for Dijkstra's algorithm
   const drawGraphVisualization = (
     ctx: CanvasRenderingContext2D,
     graph: any,
     step: number,
     algorithm: Algorithm
   ) => {
-    // Simple graph visualization placeholder
     const canvas = ctx.canvas;
-    const nodes = [
-      { id: "A", x: 100, y: 100 },
-      { id: "B", x: 200, y: 150 },
-      { id: "C", x: 300, y: 100 },
-      { id: "D", x: 250, y: 250 },
-    ];
+    // Expecting graph to be { nodes, edges } and stepData to be currentStepData
+    // Use currentStepData if available for more accurate state
+    const stepData = currentStepData;
+    if (!stepData || !stepData.data || !stepData.data.nodes) return;
+    const nodes = stepData.data.nodes;
+    const edges = stepData.data.edges;
+    // Determine grid size
+    const gridSize = Math.ceil(Math.sqrt(nodes.length));
+    const cellSize = Math.min(canvas.width, canvas.height) / gridSize;
 
-    // Draw edges
-    ctx.strokeStyle = "#ddd";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(nodes[0].x, nodes[0].y);
-    ctx.lineTo(nodes[1].x, nodes[1].y);
-    ctx.moveTo(nodes[1].x, nodes[1].y);
-    ctx.lineTo(nodes[2].x, nodes[2].y);
-    ctx.moveTo(nodes[1].x, nodes[1].y);
-    ctx.lineTo(nodes[3].x, nodes[3].y);
-    ctx.stroke();
-
-    // Draw nodes
-    nodes.forEach((node, index) => {
-      let color = algorithm.visualization.colors.default;
-      
-      if (step > 0 && index < step) {
-        color = algorithm.visualization.colors.visited || color;
-      } else if (index === step) {
-        color = algorithm.visualization.colors.current || color;
+    // Build a map of node positions
+    const nodeMap = new Map(nodes.map((n: any) => [n.id, n]));
+    // Build a 2D grid for maze
+    const grid: (any | null)[][] = Array.from({ length: gridSize }, () => Array(gridSize).fill(null));
+    nodes.forEach((node: any) => {
+      if (typeof node.x === 'number' && typeof node.y === 'number') {
+        grid[node.y][node.x] = node;
       }
-
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
-      ctx.fill();
-
-      ctx.fillStyle = "#000";
-      ctx.font = "14px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(node.id, node.x, node.y + 5);
     });
+
+    // Draw grid
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        const node = grid[y][x];
+        let color = '#fff';
+        if (node) {
+          // Visited
+          if (stepData.highlightedElements && stepData.highlightedElements.includes(node.id)) {
+            color = '#90cdf4'; // blue for visited
+          }
+          // Current
+          if (stepData.comparingElements && stepData.comparingElements.includes(node.id)) {
+            color = '#f6e05e'; // yellow for current
+          }
+          // Start
+          if (node.distance === 0) {
+            color = '#68d391'; // green for start
+          }
+          // Wall (optional, if you want to support walls)
+          // if (node.isWall) color = '#2d3748';
+        } else {
+          color = '#2d3748'; // wall
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        // Draw border
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      }
+    }
+
+    // Optionally, draw shortest path if available
+    if (stepData.shortestPath && Array.isArray(stepData.shortestPath)) {
+      ctx.strokeStyle = '#f56565';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      let started = false;
+      for (const nodeId of stepData.shortestPath) {
+        const node = nodeMap.get(nodeId);
+        if (node) {
+          const cx = node.x * cellSize + cellSize / 2;
+          const cy = node.y * cellSize + cellSize / 2;
+          if (!started) {
+            ctx.moveTo(cx, cy);
+            started = true;
+          } else {
+            ctx.lineTo(cx, cy);
+          }
+        }
+      }
+      ctx.stroke();
+    }
   };
 
   return (

@@ -42,6 +42,7 @@ export default function Visualizer() {
     setInputData,
     metrics,
     reset,
+    currentStepData,
   } = useAlgorithm(selectedAlgorithm);
 
   const getDifficultyColor = (difficulty: string) => {
@@ -165,6 +166,7 @@ export default function Visualizer() {
                       inputData={inputData}
                       currentStep={currentStep}
                       isPlaying={isPlaying}
+                      currentStepData={currentStepData}
                     />
                   </CardContent>
                 </Card>

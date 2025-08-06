@@ -1,5 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
+
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Algorithm } from "@shared/schema";
+import { bubbleSort, quickSort } from "@/lib/algorithms/sorting";
+import { dijkstraVisualization } from "@/lib/algorithms/graph";
 
 interface AlgorithmState {
   isPlaying: boolean;
@@ -32,22 +35,39 @@ export function useAlgorithm(algorithm: Algorithm | undefined) {
     },
   });
 
-  // Generate steps based on algorithm and input data
+  // Generate real steps for sorting algorithms
   const generateSteps = useCallback((algorithm: Algorithm, inputData: any) => {
     if (!algorithm || !inputData) return [];
-    
-    // This is a simplified step generation
-    // In a real implementation, you would have algorithm-specific step generators
     if (algorithm.category === "sorting" && inputData.array) {
-      return Array.from({ length: inputData.array.length * 2 }, (_, i) => ({
-        step: i,
-        description: `Step ${i + 1}`,
-        data: [...inputData.array],
-      }));
+      if (algorithm.name.toLowerCase() === "bubble sort") {
+        return bubbleSort(inputData.array);
+      } else if (algorithm.name.toLowerCase() === "quick sort") {
+        return quickSort(inputData.array);
+      }
     }
-    
+    if (
+      algorithm.category === "graph" &&
+      (algorithm.name.toLowerCase() === "dijkstra's algorithm" || algorithm.name.toLowerCase() === "dijkstra") &&
+      inputData.nodes && inputData.edges && inputData.startNode
+    ) {
+      // Use dijkstraVisualization to generate steps and map to VisualizationStep format
+      const graphSteps = dijkstraVisualization(inputData.nodes, inputData.edges, inputData.startNode);
+      return graphSteps.map((step: any, index: number) => {
+        return {
+          id: index,
+          description: step.description,
+          data: { nodes: step.nodes, edges: step.edges },
+          highlightedElements: Array.isArray(step.visitedNodes) ? step.visitedNodes : [],
+          comparingElements: step.currentNode ? [step.currentNode] : undefined,
+          shortestPath: step.shortestPath,
+        };
+      });
+    }
     return [];
   }, []);
+
+  // Store the steps in state
+  const [steps, setSteps] = useState<any[]>([]);
 
   // Reset to initial state
   const reset = useCallback(() => {
@@ -162,17 +182,24 @@ export function useAlgorithm(algorithm: Algorithm | undefined) {
     return () => clearInterval(interval);
   }, [state.isPlaying, state.speed, algorithm]);
 
-  // Update total steps when algorithm or input changes
+  // Update steps and totalSteps when algorithm or input changes
   useEffect(() => {
     if (algorithm && state.inputData) {
-      const steps = generateSteps(algorithm, state.inputData);
+      const generatedSteps = generateSteps(algorithm, state.inputData);
+      setSteps(generatedSteps);
       setState(prev => ({
         ...prev,
-        totalSteps: steps.length,
+        totalSteps: generatedSteps.length,
         currentStep: 0,
       }));
     }
   }, [algorithm, state.inputData, generateSteps]);
+
+  // Provide the current step's data for visualization
+  const currentStepData = useMemo(() => {
+    if (steps.length === 0) return null;
+    return steps[Math.min(state.currentStep, steps.length - 1)];
+  }, [steps, state.currentStep]);
 
   return {
     isPlaying: state.isPlaying,
@@ -190,5 +217,6 @@ export function useAlgorithm(algorithm: Algorithm | undefined) {
     setSpeed,
     setInputData,
     reset,
+    currentStepData,
   };
 }
