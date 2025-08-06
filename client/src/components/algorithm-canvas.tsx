@@ -44,10 +44,11 @@ export default function AlgorithmCanvas({
         currentStepData,
         algorithm
       );
-    } else if (algorithm.category === "searching" && inputData.array) {
-      drawSearchVisualization(ctx, inputData.array, currentStep, algorithm);
-    } else if (algorithm.category === "graph" && inputData.graph) {
-      drawGraphVisualization(ctx, inputData.graph, currentStep, algorithm);
+    } else if (algorithm.category === "searching" && currentStepData) {
+      drawSearchStepVisualization(ctx, currentStepData, algorithm);
+    } else if (algorithm.category === "graph" && currentStepData) {
+      // Dijkstra and BFS both use the same grid/maze visualization style
+      drawGraphVisualization(ctx, currentStepData.data, currentStepData, algorithm);
     }
   }, [algorithm, inputData, currentStep, draw, clearCanvas]);
 
@@ -92,39 +93,31 @@ export default function AlgorithmCanvas({
     });
   };
 
-  const drawSearchVisualization = (
+  // Visualize searching algorithms using real step data
+  const drawSearchStepVisualization = (
     ctx: CanvasRenderingContext2D,
-    array: number[],
-    step: number,
+    stepData: any,
     algorithm: Algorithm
   ) => {
     const canvas = ctx.canvas;
+    const array = stepData.array;
     const barWidth = Math.min((canvas.width - 40) / array.length, 60);
     const barGap = 2;
     const barHeight = 60;
-
-    array.forEach((value, index) => {
+    array.forEach((value: number, index: number) => {
       const x = 20 + index * (barWidth + barGap);
       const y = canvas.height / 2 - barHeight / 2;
-
-      // Determine color based on search state
       const viz = algorithm.visualization as any;
       let color = viz.colors?.default;
-      
-      if (step > 0) {
-        const searchIndex = Math.floor(step / 2);
-        if (index === searchIndex) {
-          color = viz.colors?.searching || color;
-        } else if (index < searchIndex) {
-          color = viz.colors?.eliminated || color;
-        }
+      if (stepData.found === index) {
+        color = viz.colors?.found || '#68d391';
+      } else if (stepData.searching && stepData.searching.includes(index)) {
+        color = viz.colors?.searching || '#f6e05e';
+      } else if (stepData.eliminated && stepData.eliminated.includes(index)) {
+        color = viz.colors?.eliminated || '#a0aec0';
       }
-
-      // Draw bar
       ctx.fillStyle = color;
       ctx.fillRect(x, y, barWidth, barHeight);
-
-      // Draw value
       ctx.fillStyle = "#000";
       ctx.font = "14px sans-serif";
       ctx.textAlign = "center";
@@ -132,20 +125,17 @@ export default function AlgorithmCanvas({
     });
   };
 
-  // Maze-style visualization for Dijkstra's algorithm
+  // Maze-style visualization for Dijkstra's and BFS algorithms
   const drawGraphVisualization = (
     ctx: CanvasRenderingContext2D,
     graph: any,
-    step: number,
+    stepData: any,
     algorithm: Algorithm
   ) => {
     const canvas = ctx.canvas;
-    // Expecting graph to be { nodes, edges } and stepData to be currentStepData
-    // Use currentStepData if available for more accurate state
-    const stepData = currentStepData;
-    if (!stepData || !stepData.data || !stepData.data.nodes) return;
-    const nodes = stepData.data.nodes;
-    const edges = stepData.data.edges;
+    if (!graph || !graph.nodes) return;
+    const nodes = graph.nodes;
+    const edges = graph.edges;
     // Determine grid size
     const gridSize = Math.ceil(Math.sqrt(nodes.length));
     const cellSize = Math.min(canvas.width, canvas.height) / gridSize;
@@ -191,7 +181,7 @@ export default function AlgorithmCanvas({
       }
     }
 
-    // Optionally, draw shortest path if available
+    // Optionally, draw shortest path if available (for Dijkstra)
     if (stepData.shortestPath && Array.isArray(stepData.shortestPath)) {
       ctx.strokeStyle = '#f56565';
       ctx.lineWidth = 4;
@@ -199,9 +189,9 @@ export default function AlgorithmCanvas({
       let started = false;
       for (const nodeId of stepData.shortestPath) {
         const node = nodeMap.get(nodeId);
-        if (node) {
-          const cx = node.x * cellSize + cellSize / 2;
-          const cy = node.y * cellSize + cellSize / 2;
+        if (node && typeof (node as any).x === 'number' && typeof (node as any).y === 'number') {
+          const cx = (node as any).x * cellSize + cellSize / 2;
+          const cy = (node as any).y * cellSize + cellSize / 2;
           if (!started) {
             ctx.moveTo(cx, cy);
             started = true;

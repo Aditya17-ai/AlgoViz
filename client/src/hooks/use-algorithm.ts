@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Algorithm } from "@shared/schema";
 import { bubbleSort, quickSort } from "@/lib/algorithms/sorting";
+import { linearSearch, binarySearch } from "@/lib/algorithms/searching";
 import { dijkstraVisualization } from "@/lib/algorithms/graph";
 
 interface AlgorithmState {
@@ -38,13 +39,31 @@ export function useAlgorithm(algorithm: Algorithm | undefined) {
   // Generate real steps for sorting algorithms
   const generateSteps = useCallback((algorithm: Algorithm, inputData: any) => {
     if (!algorithm || !inputData) return [];
+    // Sorting algorithms
     if (algorithm.category === "sorting" && inputData.array) {
-      if (algorithm.name.toLowerCase() === "bubble sort") {
-        return bubbleSort(inputData.array);
-      } else if (algorithm.name.toLowerCase() === "quick sort") {
-        return quickSort(inputData.array);
+      switch (algorithm.name.toLowerCase()) {
+        case "bubble sort":
+          return bubbleSort(inputData.array);
+        case "quick sort":
+          return quickSort(inputData.array);
+        // Add more sorting algorithms here
+        default:
+          return [];
       }
     }
+    // Searching algorithms
+    if (algorithm.category === "searching" && inputData.array && typeof inputData.target === "number") {
+      switch (algorithm.name.toLowerCase()) {
+        case "linear search":
+          return linearSearch(inputData.array, inputData.target);
+        case "binary search":
+          return binarySearch(inputData.array, inputData.target);
+        // Add more searching algorithms here
+        default:
+          return [];
+      }
+    }
+    // Graph algorithms
     if (
       algorithm.category === "graph" &&
       (algorithm.name.toLowerCase() === "dijkstra's algorithm" || algorithm.name.toLowerCase() === "dijkstra") &&
